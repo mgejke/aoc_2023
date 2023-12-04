@@ -20,3 +20,5 @@ target/
 data/inputs/*
 
 !data/inputs/.keep
+
+.vscode/
