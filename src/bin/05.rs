@@ -1,13 +1,16 @@
 use itertools::Itertools;
 use nom::{
     bytes::complete::{tag, take_while1},
-    character::complete::{digit1, multispace0, multispace1, space1},
-    combinator::map_res,
+    character::{
+        self,
+        complete::{multispace0, multispace1, space1},
+    },
     multi::{many1, separated_list1},
     sequence::{terminated, tuple},
     IResult, Parser,
 };
 use rayon::prelude::*;
+use std::ops::RangeInclusive;
 
 advent_of_code::solution!(5);
 
@@ -19,14 +22,14 @@ struct SeedList {
 #[derive(Debug)]
 struct TranslationMap {
     name: String,
-    ranges: Vec<(i64, i64, i64)>,
+    ranges: Vec<(RangeInclusive<i64>, i64)>,
 }
 
 impl TranslationMap {
     fn translate(&self, value: i64) -> i64 {
-        for (to, from, length) in &self.ranges {
-            if value >= *from && value <= from + length {
-                return value - (*from - *to);
+        for (range, offset) in &self.ranges {
+            if range.contains(&value) {
+                return value - (range.start() - *offset);
             }
         }
         value
@@ -64,25 +67,16 @@ fn parse_seed_list(line: &str) -> IResult<&str, SeedList> {
 }
 
 fn parse_space_separated(line: &str) -> IResult<&str, Vec<i64>> {
-    separated_list1(space1, map_res(digit1, |s: &str| s.parse::<i64>()))(line)
+    separated_list1(space1, character::complete::i64)(line)
 }
 
-fn parse_map_range(line: &str) -> IResult<&str, (i64, i64, i64)> {
+fn parse_map_range(line: &str) -> IResult<&str, (RangeInclusive<i64>, i64)> {
     tuple((
-        terminated(digit1, multispace1),
-        terminated(digit1, multispace1),
-        terminated(digit1, multispace1),
+        terminated(character::complete::i64, multispace1),
+        terminated(character::complete::i64, multispace1),
+        terminated(character::complete::i64, multispace1),
     ))(line)
-    .map(|(rest, (start, stop, length))| {
-        Ok((
-            rest,
-            (
-                start.parse().unwrap(),
-                stop.parse().unwrap(),
-                length.parse().unwrap(),
-            ),
-        ))
-    })?
+    .map(|(rest, (dest, src, length))| Ok((rest, (src..=src + length, dest))))?
 }
 
 fn parse_map(line: &str) -> IResult<&str, TranslationMap> {
@@ -113,15 +107,19 @@ pub fn part_one(input: &str) -> Option<u32> {
 pub fn part_two(input: &str) -> Option<u32> {
     let (seed_list, maps) = parse_all(input);
     let ranges: Vec<(i64, i64)> = seed_list.seeds.into_iter().tuples().collect_vec();
-    let result = ranges.into_par_iter().fold_with(i64::MAX, |mut acc, (start, range)| {
+    let result = ranges
+        .into_par_iter()
+        .fold_with(i64::MAX, |mut acc, (start, range)| {
             for mut seed in start..start + range {
                 for map in &maps {
                     seed = map.translate(seed);
                 }
                 acc = acc.min(seed);
             }
-            acc        
-    }).min().unwrap();
+            acc
+        })
+        .min()
+        .unwrap();
     Some(result as u32)
 }
 
@@ -132,7 +130,7 @@ mod tests {
     #[test]
     fn test_parse_full() {
         let data = advent_of_code::template::read_file("examples", DAY);
-        let _result = parse_all(&data);
+        let _ = parse_all(&data);
     }
 
     #[test]
@@ -149,7 +147,7 @@ mod tests {
                 "",
                 TranslationMap {
                     name: "soil-to-fertilizer map".to_string(),
-                    ranges: vec![(0, 15, 37), (37, 52, 2), (39, 0, 15)]
+                    ranges: vec![(15..=15 + 37, 0), (52..=52 + 2, 37), (0..=15, 39)]
                 }
             ))
         );
@@ -158,7 +156,7 @@ mod tests {
     #[test]
     fn test_parse_map_range() {
         let result = parse_map_range("50 98 2 ");
-        assert_eq!(result, Ok(("", (50, 98, 2))));
+        assert_eq!(result, Ok(("", (98..=98 + 2, 50))));
     }
 
     #[test]
