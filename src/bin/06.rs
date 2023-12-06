@@ -40,15 +40,22 @@ fn parse_space_separated_str(line: &str) -> IResult<&str, Vec<&str>> {
 }
 
 fn ways_to_win(time: i64, distance: i64) -> usize {
-    (0..time)
-        .filter_map(|t| {
-            if t * (time - t) > distance {
-                Some(1)
-            } else {
-                None
-            }
-        })
-        .count()
+    let sqrt = ((time*time - 4 * distance) as f64).sqrt();
+    let lower = ((-time as f64) + sqrt) / -2.0;
+    let upper = ((-time as f64) - sqrt) / -2.0;
+    let l = lower.ceil();
+    let u = upper.floor();
+
+    let mut result = (u - l + 1.0) as usize;
+
+    if l == lower {
+        result -= 1;
+    }
+
+    if u == upper {
+        result -= 1;
+    }
+    result
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
