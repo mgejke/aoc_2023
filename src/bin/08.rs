@@ -1,17 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
-use itertools::Itertools;
-
 advent_of_code::solution!(8);
 
-pub fn part_one(input: &str) -> Option<u32> {
+pub fn part_one(input: &str) -> Option<u64> {
     let (path, nodes) = input.trim().split_once("\n\n").unwrap();
     let nodes = get_map(nodes);
     let current = "AAA";
-    if let Some(value) = solve_path(path, &nodes, current, |c| c == "ZZZ") {
-        return Some(value);
-    }
-    None
+    Some(solve_path(path, &nodes, current, |c| c == "ZZZ"))
 }
 
 fn solve_path<'a>(
@@ -19,7 +14,7 @@ fn solve_path<'a>(
     nodes: &HashMap<&str, (&'a str, &'a str)>,
     mut current: &'a str,
     end_condition: impl Fn(&str) -> bool,
-) -> Option<u32> {
+) -> u64 {
     for (i, path) in path.chars().cycle().enumerate() {
         let (l, r) = nodes.get(current).unwrap();
         current = match path {
@@ -28,10 +23,10 @@ fn solve_path<'a>(
             _ => panic!("unknown path option"),
         };
         if end_condition(current) {
-            return Some(i as u32 + 1);
+            return i as u64 + 1;
         }
     }
-    None
+    panic!("unsolvable")
 }
 
 fn get_map(nodes: &str) -> HashMap<&str, (&str, &str)> {
@@ -50,15 +45,13 @@ pub fn part_two(input: &str) -> Option<u64> {
     let (path, nodes) = input.trim().split_once("\n\n").unwrap();
     let nodes = get_map(nodes);
 
-    let start_nodes = nodes.keys().filter(|k| k.ends_with('A')).collect_vec();
+    let start_nodes = nodes.keys().filter(|k| k.ends_with('A'));
     let mut lcd: HashSet<u64> = HashSet::new();
     for node in start_nodes {
         let r = solve_path(path, &nodes, node, |c| c.ends_with('Z'));
-        let factors = primes::factors(r.unwrap() as u64);
-        lcd.extend(factors);
+        lcd.extend(primes::factors(r));
     }
-    let result: u64 = lcd.iter().product();
-    Some(result)
+    Some(lcd.iter().product())
 }
 
 #[cfg(test)]
