@@ -21,7 +21,6 @@ fn find_mirror(grid: &[Vec<char>], end_condition: u32) -> u32 {
 
     for x in 1..width {
         let max_range = x.min(width - x);
-
         let differences = grid.iter().map(|row| {
             let left = row[x - max_range..x].iter();
             let right = row[x..x + max_range].iter().rev();
@@ -37,21 +36,28 @@ fn find_mirror(grid: &[Vec<char>], end_condition: u32) -> u32 {
     0
 }
 
+fn get_grid(block: &str) -> Vec<Vec<char>> {
+    let grid = block
+        .lines()
+        .map(|line| line.chars().collect_vec())
+        .collect_vec();
+    grid
+}
+fn test_for_mirrors(grid: Vec<Vec<char>>, end_condition: u32) -> u32 {
+    let vert = find_mirror(&grid, end_condition);
+    if vert > 0 {
+        vert
+    } else {
+        find_mirror(&transpose(grid), end_condition) * 100
+    }
+}
+
 pub fn part_one(input: &str) -> Option<u32> {
     let grids = input.trim().split("\n\n");
 
     let result = grids.map(|block| {
-        let grid = block
-            .lines()
-            .map(|line| line.chars().collect_vec())
-            .collect_vec();
-
-        let vert = find_mirror(&grid, 0);
-        if vert > 0 {
-            vert
-        } else {
-            find_mirror(&transpose(grid), 0) * 100
-        }
+        let grid = get_grid(block);
+        test_for_mirrors(grid, 0)
     });
     Some(result.sum())
 }
@@ -60,19 +66,9 @@ pub fn part_two(input: &str) -> Option<u32> {
     let grids = input.trim().split("\n\n");
 
     let result = grids.map(|block| {
-        let grid = block
-            .lines()
-            .map(|line| line.chars().collect_vec())
-            .collect_vec();
-
-        let vert = find_mirror(&grid, 1);
-        if vert > 0 {
-            vert
-        } else {
-            find_mirror(&transpose(grid), 1) * 100
-        }
+        let grid = get_grid(block);
+        test_for_mirrors(grid, 1)
     });
-
     Some(result.sum())
 }
 
