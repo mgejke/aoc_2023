@@ -1,6 +1,8 @@
 advent_of_code::solution!(1);
 use std::{collections::HashMap, str};
 
+use itertools::Itertools;
+
 pub fn part_one(input: &str) -> Option<u32> {
     let sum: u32 = input
         .trim()
@@ -8,15 +10,11 @@ pub fn part_one(input: &str) -> Option<u32> {
         .map(|line| {
             let digits = line
                 .chars()
-                .filter(|c| c.is_ascii_digit())
-                .collect::<Vec<_>>();
-            let v: u32 = format!("{}{}", digits.first().unwrap(), digits.last().unwrap())
-                .parse()
-                .unwrap();
-            v
+                .filter_map(|c| c.to_digit(10))
+                .collect_vec();
+                digits.first().unwrap() * 10 + digits.last().unwrap()
         })
         .sum();
-
     Some(sum)
 }
 
