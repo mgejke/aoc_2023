@@ -1,9 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    ops::{Add, AddAssign},
-};
+use std::collections::{HashMap, HashSet, VecDeque};
 
-use itertools::Itertools;
+use advent_of_code::{parse_to_vec_vec_grid, vec_vec_grid_with_type, Grid, Point};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 advent_of_code::solution!(16);
@@ -50,36 +47,6 @@ impl Ray {
     }
 }
 
-#[derive(Clone, Copy)]
-struct Point {
-    x: i32,
-    y: i32,
-}
-
-impl Point {
-    fn new(x: i32, y: i32) -> Self {
-        Self { x, y }
-    }
-}
-
-impl Add for Point {
-    type Output = Point;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-        }
-    }
-}
-
-impl AddAssign for Point {
-    fn add_assign(&mut self, rhs: Self) {
-        self.x += rhs.x;
-        self.y += rhs.y;
-    }
-}
-
 enum Object {
     Empty,
     HSplitter,
@@ -88,44 +55,25 @@ enum Object {
     BMirror,
 }
 
-fn in_bounds(ray: &Ray, width: usize, height: usize) -> bool {
-    ray.position.x >= 0
-        && ray.position.x < width as i32
-        && ray.position.y >= 0
-        && ray.position.y < height as i32
-}
+fn calculate_score(start_ray: Ray, grid: &Grid<Object>) -> usize {
+    let mut visited: Grid<HashSet<Direction>> = vec_vec_grid_with_type(grid.width, grid.height);
 
-fn parse_grid<T>(input: &str, f: fn(char) -> T) -> Vec<Vec<T>> {
-    input
-        .trim()
-        .lines()
-        .map(|line| line.chars().map(f).collect_vec())
-        .collect_vec()
-}
-
-fn calculate_score(width: usize, height: usize, start_ray: Ray, grid: &[Vec<Object>]) -> usize {
-    let mut visited: Vec<Vec<HashSet<Direction>>> = vec![
-        std::iter::repeat_with(HashSet::new)
-            .take(width)
-            .collect_vec();
-        height
-    ];
     let mut rays = VecDeque::from_iter([start_ray]);
     while let Some(mut ray) = rays.pop_front() {
         loop {
             ray.step();
-            if !in_bounds(&ray, width, height) {
-                break;
-            }
 
-            let v = &mut visited[ray.position.y as usize][ray.position.x as usize];
+            let (current, v) = match (grid.get(&ray.position), visited.get_mut(&ray.position)) {
+                (Some(current), Some(v)) => (current, v),
+                _ => break,
+            };
+
             if v.contains(&ray.direction) {
                 break;
             }
             v.insert(ray.direction);
 
-            let current = &grid[ray.position.y as usize][ray.position.x as usize];
-            match (current, &ray.direction) {
+            match (current, ray.direction) {
                 (Object::Empty, _) => continue,
                 (Object::HSplitter, Direction::Up | Direction::Down) => {
                     rays.push_back(Ray::new(ray.position, Direction::Left));
@@ -153,7 +101,12 @@ fn calculate_score(width: usize, height: usize, start_ray: Ray, grid: &[Vec<Obje
             }
         }
     }
-    visited.iter().flatten().filter(|hm| !hm.is_empty()).count()
+    visited
+        .grid
+        .iter()
+        .flatten()
+        .filter(|hm| !hm.is_empty())
+        .count()
 }
 
 fn char_to_object(c: char) -> Object {
@@ -168,38 +121,25 @@ fn char_to_object(c: char) -> Object {
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
-    let grid = parse_grid(input, char_to_object);
-    let height = grid.len();
-    let width = grid[0].len();
-    let sum = calculate_score(
-        width,
-        height,
-        Ray::new(Point::new(-1, 0), Direction::Right),
-        &grid,
-    );
+    let grid = parse_to_vec_vec_grid(input, char_to_object);
+    let sum = calculate_score(Ray::new(Point::new(-1, 0), Direction::Right), &grid);
     Some(sum as u32)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    let grid = parse_grid(input, char_to_object);
-    let height = grid.len();
-    let width = grid[0].len();
+    let grid = parse_to_vec_vec_grid(input, char_to_object);
 
-    let up_down_max = (0_i32..width as i32)
+    let up_down_max = (0_i32..grid.width as i32)
         .into_par_iter()
         .map(|x| {
             let up = calculate_score(
-                width,
-                height,
                 Ray {
-                    position: Point::new(x, height as i32),
+                    position: Point::new(x, grid.height as i32),
                     direction: Direction::Up,
                 },
                 &grid,
             );
             let down = calculate_score(
-                width,
-                height,
                 Ray {
                     position: Point::new(x, -1),
                     direction: Direction::Down,
@@ -211,12 +151,10 @@ pub fn part_two(input: &str) -> Option<u32> {
         .max()
         .unwrap();
 
-    let left_right_max = (0_i32..height as i32)
+    let left_right_max = (0_i32..grid.height as i32)
         .into_par_iter()
         .map(|y| {
             let right = calculate_score(
-                width,
-                height,
                 Ray {
                     position: Point::new(-1, y),
                     direction: Direction::Right,
@@ -224,10 +162,8 @@ pub fn part_two(input: &str) -> Option<u32> {
                 &grid,
             );
             let left = calculate_score(
-                width,
-                height,
                 Ray {
-                    position: Point::new(width as i32, y),
+                    position: Point::new(grid.width as i32, y),
                     direction: Direction::Left,
                 },
                 &grid,
